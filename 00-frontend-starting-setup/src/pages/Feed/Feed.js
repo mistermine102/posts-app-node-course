@@ -96,9 +96,30 @@ class Feed extends Component {
       page--
       this.setState({ postPage: page })
     }
-    fetch('http://localhost:8080/feed/posts?page=' + page, {
+
+    const graphqlQuery = {
+      query: `{
+        getPosts(page:${page}) {
+          posts {
+            _id
+            title
+            content
+            createdAt
+            creator {
+              name
+            }
+          }
+          totalPosts
+        }
+      }`
+    }
+
+    fetch('http://localhost:8080/graphql', {
+      body: JSON.stringify(graphqlQuery),
+      method: "POST",
       headers: {
         Authorization: 'Bearer ' + this.props.token,
+        "Content-Type": "application/json"
       },
     })
       .then(res => {
@@ -108,12 +129,14 @@ class Feed extends Component {
         return res.json()
       })
       .then(resData => {
+        const {posts, totalPosts} = resData.data.getPosts
+        
         this.setState({
-          posts: resData.posts.map(post => ({
+          posts: posts.map(post => ({
             ...post,
             imagePath: post.imageUrl,
           })),
-          totalPosts: resData.totalItems,
+          totalPosts,
           postsLoading: false,
         })
       })

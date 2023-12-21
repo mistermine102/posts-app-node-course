@@ -124,21 +124,32 @@ module.exports = {
     }
   },
   async getPosts({ page }, req) {
-    // if(!req.isAuth) {
-    //   const error = new Error("Not autheticated.")
-    //   error.statusCode = 401
-    //   throw error
-    // }
+    if(!req.isAuth) {
+      const error = new Error("Not autheticated.")
+      error.statusCode = 401
+      throw error
+    }
 
     const postsPerPage = 2
-    console.log(page);
-
     const totalPosts = await Post.countDocuments()
-    console.log(totalPosts)
+
+    const foundPosts = await Post.find().skip(postsPerPage * (page-1)).limit(postsPerPage).populate('creator')
+
+    //transform a post to be graphql suitable
+    const posts = foundPosts.map(post => ({
+      ...post._doc,
+      _id: post._id.toString(),
+      createdAt: post.createdAt.toString(),
+      updatedAt: post.updatedAt.toString(),
+      creator: {
+        ...post.creator._doc,
+        _id: post.creator._id.toString()
+      }
+    }))
 
     return {
-      posts: [],
-      totalPosts: 0,
+      posts,
+      totalPosts,
     }
   },
 }
