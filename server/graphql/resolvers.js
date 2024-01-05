@@ -3,6 +3,7 @@ const Post = require('../models/post')
 const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const validator = require('validator')
+const AppError = require('../AppError')
 
 module.exports = {
   async createUser({ userInput }) {
@@ -17,16 +18,12 @@ module.exports = {
       errors.push({ message: 'Invalid password.' })
     }
     if (errors.length > 0) {
-      const error = new Error('Validation failed.')
-      error.errors = errors
-      error.statusCode = 400
-      throw error
+      throw new AppError('Validation failed.', 400, errors)
     }
 
     const existingUser = await User.findOne({ email })
     if (existingUser) {
-      const error = new Error('User with that email already exists.')
-      throw error
+      throw new AppError('User with that email already exists.', 400)
     }
 
     const hashedPassword = await bcrypt.hash(password, 12)
@@ -47,12 +44,10 @@ module.exports = {
   //create post
   async createPost({ postInput }, req) {
     if (!req.isAuth) {
-      const error = new Error('Not authenticated.')
-      error.statusCode = 400
-      throw error
+      throw new AppError('Not authenticated.', 400)
     }
 
-    const { title, content } = postInput
+    const { title, content, imageUrl } = postInput
 
     //validation
     const errors = []
@@ -63,24 +58,19 @@ module.exports = {
       errors.push({ message: 'Invalid content.' })
     }
     if (errors.length > 0) {
-      const error = new Error('Validation failed.')
-      error.errors = errors
-      error.statusCode = 400
-      throw error
+      throw new AppError('Validation failed.', 400, errors)
     }
 
     const creator = await User.findById(req.userId)
 
     if (!creator) {
-      const error = new Error('Invalid user')
-      error.statusCode = 400
-      throw error
+      throw new AppError('Invalid user.', 400)
     }
 
     const post = new Post({
       title,
       content,
-      imageUrl: 'test',
+      imageUrl: 'images/' + imageUrl,
       creator: creator._id,
     })
 
@@ -102,17 +92,13 @@ module.exports = {
     const user = await User.findOne({ email })
 
     if (!user) {
-      const error = new Error('Invalid email or password.')
-      error.statusCode = 400
-      throw error
+      throw new AppError('Invalid email or password.', 400)
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, user.password)
 
     if (!isPasswordCorrect) {
-      const error = new Error('Invalid email or password.')
-      error.statusCode = 400
-      throw error
+      throw new AppError('Invalid email or password.', 400)
     }
 
     //generate token
@@ -124,16 +110,17 @@ module.exports = {
     }
   },
   async getPosts({ page }, req) {
-    if(!req.isAuth) {
-      const error = new Error("Not autheticated.")
-      error.statusCode = 401
-      throw error
+    if (!req.isAuth) {
+      throw new AppError('Not authenticated.', 401)
     }
 
     const postsPerPage = 2
     const totalPosts = await Post.countDocuments()
 
-    const foundPosts = await Post.find().skip(postsPerPage * (page-1)).limit(postsPerPage).populate('creator')
+    const foundPosts = await Post.find()
+      .skip(postsPerPage * (page - 1))
+      .limit(postsPerPage)
+      .populate('creator')
 
     //transform a post to be graphql suitable
     const posts = foundPosts.map(post => ({
@@ -143,13 +130,46 @@ module.exports = {
       updatedAt: post.updatedAt.toString(),
       creator: {
         ...post.creator._doc,
-        _id: post.creator._id.toString()
-      }
+        _id: post.creator._id.toString(),
+      },
     }))
 
     return {
       posts,
       totalPosts,
+    }
+  },
+  async updatePost({ _id, title, content, imageUrl }, req) {
+
+    // if (!req.isAuth) {
+    //   throw new AppError('Not authenticated.', 401)
+    // }
+    //authorize
+    //...
+
+    const foundPost = await Post.findById(_id).populate('creator')
+    foundPost.title = title
+    foundPost.content = content
+    const savedPost = await foundPost.save()
+    const post = {
+      ...savedPost._doc,
+      _id: savedPost._id.toString(),
+      updatedAt: savedPost._id.toString(),
+      createdAt: savedPost.createdAt.toString(),
+      creator: {
+        ...savedPost.creator._doc,
+        _id: savedPost.creator._id.toString(),
+      },
+    }
+
+    return {
+      _id: post._id,
+      title: post.title,
+      content: post.content,
+      imageUrl: post.imageUrl,
+      creator: post.creator,
+      createdAt: post.createdAt,
+      updatedAt: post.updatedAt,
     }
   },
 }

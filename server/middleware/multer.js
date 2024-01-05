@@ -1,4 +1,5 @@
 const multer = require('multer')
+const AppError = require('../AppError')
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -12,7 +13,7 @@ const storage = multer.diskStorage({
 
 const fileFilter = (req, file, cb) => {
   if (file.mimetype !== 'image/png' && file.mimetype !== 'image/jpg' && file.mimetype !== 'image/jpeg') {
-    return cb(null, false)
+    return cb(new AppError('Invalid filetype.', 400))
   }
   cb(null, true)
 }

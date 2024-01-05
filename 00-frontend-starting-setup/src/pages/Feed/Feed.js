@@ -104,22 +104,24 @@ class Feed extends Component {
             _id
             title
             content
+            imageUrl
             createdAt
             creator {
               name
+              _id
             }
           }
           totalPosts
         }
-      }`
+      }`,
     }
 
     fetch('http://localhost:8080/graphql', {
       body: JSON.stringify(graphqlQuery),
-      method: "POST",
+      method: 'POST',
       headers: {
         Authorization: 'Bearer ' + this.props.token,
-        "Content-Type": "application/json"
+        'Content-Type': 'application/json',
       },
     })
       .then(res => {
@@ -129,8 +131,8 @@ class Feed extends Component {
         return res.json()
       })
       .then(resData => {
-        const {posts, totalPosts} = resData.data.getPosts
-        
+        const { posts, totalPosts } = resData.data.getPosts
+
         this.setState({
           posts: posts.map(post => ({
             ...post,
@@ -187,80 +189,111 @@ class Feed extends Component {
     this.setState({ isEditing: false, editPost: null })
   }
 
-  finishEditHandler = postData => {
-    this.setState({
-      editLoading: true,
-    })
-    // const formData = new FormData()
-    // formData.append('title', postData.title)
-    // formData.append('content', postData.content)
-    // formData.append('image', postData.image)
+  finishEditHandler = async postData => {
+    try {
+      this.setState({
+        editLoading: true,
+      })
+      const { title: inputTitle, content: inputContent } = postData
+      let filename
 
-    const { title, content } = postData
+      const formData = new FormData()
+      formData.append('image', postData.image)
 
-    const graphqlQuery = {
-      query: `
+      if(this.state.editPost) {
+        formData.append('oldPath', this.state.editPost.imagePath)
+        filename = this.state.editPost.imagePath
+      }
+
+      if(formData.image) {
+        const imageUploadRes = await fetch('http://localhost:8080/post-image', {
+          method: 'PUT',
+          headers: {
+            Authorization: 'Bearer ' + this.props.token,
+          },
+          body: formData,
+        })
+        const imageUploadResData = await imageUploadRes.json()
+        filename = imageUploadResData.filename
+  
+        if (!imageUploadRes.ok) {
+          throw new Error(imageUploadResData.message)
+        }
+      }
+
+      let mutation, idArg
+
+      if(this.state.editPost) {
+        mutation = "updatePost"
+        idArg = "_id: " + this.state.editPost._id + ", "
+      } else {
+        mutation = "createPost"
+        idArg = ""
+      }
+
+      const graphqlQuery = {
+        query: `
         mutation {
-          createPost(postInput: {title: "${title}", content: "${content}"}) {
+          ${mutation}(postInput: {${idArg}title: "${inputTitle}", content: "${inputContent}", imageUrl: "${filename}"}) {
             _id
             title
             content
             imageUrl
             creator {
               name
+              _id
             }
             createdAt
           }
         }
       `,
-    }
+      }
+      return console.log(graphqlQuery);
 
-    fetch('http://localhost:8080/graphql', {
-      method: 'POST',
-      body: JSON.stringify(graphqlQuery),
-      headers: {
-        Authorization: 'Bearer ' + this.props.token,
-        'Content-Type': 'application/json',
-      },
-    })
-      .then(res => {
-        return res.json()
+      const res = await fetch('http://localhost:8080/graphql', {
+        method: 'POST',
+        body: JSON.stringify(graphqlQuery),
+        headers: {
+          Authorization: 'Bearer ' + this.props.token,
+          'Content-Type': 'application/json',
+        },
       })
-      .then(resData => {
-        console.log(resData);
-        const { _id, title, content, creator, createdAt } = resData.data.createPost
-        const post = {
-          _id,
-          title,
-          content,
-          creator,
-          createdAt,
+      const resData = await res.json()
+
+      const { _id, title, content, creator, createdAt, imageUrl } = resData.data[mutation]
+
+      const post = {
+        _id,
+        title,
+        content,
+        creator,
+        createdAt,
+        imagePath: imageUrl
+      }
+      this.setState(prevState => {
+        let updatedPosts = [...prevState.posts]
+        if (prevState.editPost) {
+          const postIndex = prevState.posts.findIndex(p => p._id === prevState.editPost._id)
+          updatedPosts[postIndex] = post
+        } else if (prevState.posts.length < 2) {
+          updatedPosts = prevState.posts.concat(post)
         }
-        this.setState(prevState => {
-          let updatedPosts = [...prevState.posts]
-          if (prevState.editPost) {
-            const postIndex = prevState.posts.findIndex(p => p._id === prevState.editPost._id)
-            updatedPosts[postIndex] = post
-          } else if (prevState.posts.length < 2) {
-            updatedPosts = prevState.posts.concat(post)
-          }
-          return {
-            posts: updatedPosts,
-            isEditing: false,
-            editPost: null,
-            editLoading: false,
-          }
-        })
-      })
-      .catch(err => {
-        console.log(err)
-        this.setState({
+        return {
+          posts: updatedPosts,
           isEditing: false,
           editPost: null,
           editLoading: false,
-          error: err,
-        })
+        }
       })
+    } catch (err) {
+      console.log(err)
+      this.setState({
+        isEditing: false,
+        editPost: null,
+        editLoading: false,
+        error: err,
+      })
+    }
   }
 
   statusInputChangeHandler = (input, value) => {
@@ -341,6 +374,7 @@ class Feed extends Component {
               currentPage={this.state.postPage}
             >
               {this.state.posts.map(post => {
+                console.log(post)
                 return (
                   <Post
                     key={post._id}

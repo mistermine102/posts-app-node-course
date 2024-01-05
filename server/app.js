@@ -7,6 +7,8 @@ const { graphqlHTTP } = require('express-graphql')
 const graphqlSchema = require('./graphql/schema')
 const graphqlResolver = require('./graphql/resolvers')
 const { auth } = require('./middleware/auth')
+const AppError = require('./AppError')
+const multer = require('multer')
 
 const app = express()
 const dbUrl = 'mongodb+srv://szymonix:szymonix@atlascluster.0207bfc.mongodb.net/node-course-posts-app?retryWrites=true&w=majority'
@@ -25,6 +27,20 @@ app.use('/status', statusRoutes)
 
 app.use(auth)
 
+const upload = require('./middleware/multer')
+
+app.put('/post-image', upload.single('image'), (req, res) => {
+  if (!req.isAuth) {
+    throw new AppError('Not authenticated', 401)
+  }
+
+  if(req.body.oldPath) {
+    //clear old image
+  }
+  
+  res.json({message: "image posted succesfully", filename: req.file.filename})
+})
+
 app.use(
   '/graphql',
   graphqlHTTP({
@@ -32,7 +48,7 @@ app.use(
     rootValue: graphqlResolver,
     graphiql: true,
     customFormatErrorFn(err) {
-      console.log(err);
+      console.log(err)
       if (!err.originalError) {
         return err
       }
@@ -49,7 +65,11 @@ app.use(
 
 //error handling middleware
 app.use((err, req, res, next) => {
-  console.log(err)
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      err.statusCode = 400
+    }
+  }
   const { message, statusCode = 500 } = err
   res.status(statusCode).json({ message })
 })
