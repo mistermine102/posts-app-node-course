@@ -18,21 +18,23 @@ app.use(bodyParser.json())
 app.use('/images', express.static(path.join(__dirname, 'images')))
 
 //routes
-const feedRoutes = require('./routes/feed')
-const authRoutes = require('./routes/auth')
-const statusRoutes = require('./routes/status')
-app.use('/feed', feedRoutes)
-app.use(authRoutes)
-app.use('/status', statusRoutes)
+// const feedRoutes = require('./routes/feed')
+// const authRoutes = require('./routes/auth')
+// const statusRoutes = require('./routes/status')
+// app.use('/feed', feedRoutes)
+// app.use(authRoutes)
+// app.use('/status', statusRoutes)
 
 app.use(auth)
 
 const upload = require('./middleware/multer')
 
-app.put('/post-image', upload.single('image'), (req, res) => {
+app.put('/post-image', upload.single('image'), (req, res) => {  
   if (!req.isAuth) {
     throw new AppError('Not authenticated', 401)
   }
+
+  console.log(req.file);
 
   if(req.body.oldPath) {
     //clear old image

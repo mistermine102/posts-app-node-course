@@ -198,14 +198,14 @@ class Feed extends Component {
       let filename
 
       const formData = new FormData()
-      formData.append('image', postData.image)
 
       if(this.state.editPost) {
         formData.append('oldPath', this.state.editPost.imagePath)
         filename = this.state.editPost.imagePath
       }
 
-      if(formData.image) {
+      //uploading and updating image
+      if(typeof postData.image !== 'string') {
         const imageUploadRes = await fetch('http://localhost:8080/post-image', {
           method: 'PUT',
           headers: {
@@ -220,12 +220,12 @@ class Feed extends Component {
           throw new Error(imageUploadResData.message)
         }
       }
-
+      return
       let mutation, idArg
 
       if(this.state.editPost) {
         mutation = "updatePost"
-        idArg = "_id: " + this.state.editPost._id + ", "
+        idArg = "_id: \"" + this.state.editPost._id + "\", "
       } else {
         mutation = "createPost"
         idArg = ""
@@ -248,7 +248,7 @@ class Feed extends Component {
         }
       `,
       }
-      return console.log(graphqlQuery);
+      console.log(graphqlQuery)
 
       const res = await fetch('http://localhost:8080/graphql', {
         method: 'POST',
@@ -302,16 +302,28 @@ class Feed extends Component {
 
   deletePostHandler = postId => {
     this.setState({ postsLoading: true })
-    fetch('http://localhost:8080/feed/post/' + postId, {
-      method: 'DELETE',
+
+    const graphqlQuery = {
+      query: `
+        mutation {
+          deletePost(postInput: {_id: "${postId}"}) {
+            title
+          }
+        }
+      `
+    }
+    fetch('http://localhost:8080/graphql', {
+      method: 'POST',
+      body: JSON.stringify(graphqlQuery) ,
       headers: {
         Authorization: 'Bearer ' + this.props.token,
+        "Content-Type": "application/json" 
       },
     })
       .then(res => {
-        if (res.status !== 200 && res.status !== 201) {
-          throw new Error('Deleting a post failed!')
-        }
+        // if (res.status !== 200 && res.status !== 201) {
+        //   throw new Error('Deleting a post failed!')
+        // }
         return res.json()
       })
       .then(resData => {
@@ -374,7 +386,6 @@ class Feed extends Component {
               currentPage={this.state.postPage}
             >
               {this.state.posts.map(post => {
-                console.log(post)
                 return (
                   <Post
                     key={post._id}

@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const validator = require('validator')
 const AppError = require('../AppError')
+const Mongoose = require('mongoose')
 
 module.exports = {
   async createUser({ userInput }) {
@@ -40,7 +41,28 @@ module.exports = {
       _id: createdUser._id.toString(),
     }
   },
+  //login
+  async login({ email, password }) {
+    const user = await User.findOne({ email })
 
+    if (!user) {
+      throw new AppError('Invalid email or password.', 400)
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(password, user.password)
+
+    if (!isPasswordCorrect) {
+      throw new AppError('Invalid email or password.', 400)
+    }
+
+    //generate token
+    const token = jwt.sign({ _id: user._id.toString() }, 'secret')
+
+    return {
+      token,
+      userId: user._id,
+    }
+  },
   //create post
   async createPost({ postInput }, req) {
     if (!req.isAuth) {
@@ -86,34 +108,7 @@ module.exports = {
       updatedAt: savedPost._doc.updatedAt.toString(),
     }
   },
-
-  //login
-  async login({ email, password }) {
-    const user = await User.findOne({ email })
-
-    if (!user) {
-      throw new AppError('Invalid email or password.', 400)
-    }
-
-    const isPasswordCorrect = await bcrypt.compare(password, user.password)
-
-    if (!isPasswordCorrect) {
-      throw new AppError('Invalid email or password.', 400)
-    }
-
-    //generate token
-    const token = jwt.sign({ _id: user._id.toString() }, 'secret')
-
-    return {
-      token,
-      userId: user._id,
-    }
-  },
-  async getPosts({ page }, req) {
-    if (!req.isAuth) {
-      throw new AppError('Not authenticated.', 401)
-    }
-
+  async getPosts({ page }) {
     const postsPerPage = 2
     const totalPosts = await Post.countDocuments()
 
@@ -139,13 +134,37 @@ module.exports = {
       totalPosts,
     }
   },
-  async updatePost({ _id, title, content, imageUrl }, req) {
+  async getPost({ id }) {
+    if (!id.match(/^[0-9a-fA-F]{24}$/)) {
+      throw new AppError("Invalid post id.", 400)
+    }
+
+    const post = await Post.findById(id).populate('creator')
+
+    if (!post) {
+      throw new AppError("No post found.", 404)
+    }
+
+    return {
+      ...post._doc,
+      _id: post._id.toString(),
+      createdAt: post.createdAt.toString(),
+      updatedAt: post.updatedAt.toString(),
+      creator: {
+        ...post.creator._doc,
+        _id: post.creator._id.toString(),
+      },
+    }
+  },
+  async updatePost({ postInput }, req) {
 
     // if (!req.isAuth) {
     //   throw new AppError('Not authenticated.', 401)
     // }
     //authorize
     //...
+    const { _id, title, content, imageUrl } = postInput
+    console.log(_id);
 
     const foundPost = await Post.findById(_id).populate('creator')
     foundPost.title = title
@@ -172,4 +191,23 @@ module.exports = {
       updatedAt: post.updatedAt,
     }
   },
+  async deletePost({ postInput }, req) {
+    // if (!req.isAuth) {
+    //   throw new AppError('Not authenticated.', 400)
+    // }
+
+    const { _id } = postInput
+    const post = await Post.findByIdAndDelete(_id)
+
+    return {
+      ...post._doc,
+      _id: post._id.toString(),
+      createdAt: post.createdAt.toString(),
+      updatedAt: post.updatedAt.toString(),
+      creator: {
+        ...post.creator._doc,
+        _id: post.creator._id.toString(),
+      },
+    }
+  }
 }
