@@ -4,7 +4,7 @@ const bcrypt = require('bcryptjs')
 const jwt = require('jsonwebtoken')
 const validator = require('validator')
 const AppError = require('../AppError')
-const Mongoose = require('mongoose')
+const { removeFile } = require('../utils')
 
 module.exports = {
   async createUser({ userInput }) {
@@ -136,13 +136,13 @@ module.exports = {
   },
   async getPost({ id }) {
     if (!id.match(/^[0-9a-fA-F]{24}$/)) {
-      throw new AppError("Invalid post id.", 400)
+      throw new AppError('Invalid post id.', 400)
     }
 
     const post = await Post.findById(id).populate('creator')
 
     if (!post) {
-      throw new AppError("No post found.", 404)
+      throw new AppError('No post found.', 404)
     }
 
     return {
@@ -157,19 +157,19 @@ module.exports = {
     }
   },
   async updatePost({ postInput }, req) {
-
     // if (!req.isAuth) {
     //   throw new AppError('Not authenticated.', 401)
     // }
     //authorize
     //...
     const { _id, title, content, imageUrl } = postInput
-    console.log(_id);
 
     const foundPost = await Post.findById(_id).populate('creator')
     foundPost.title = title
     foundPost.content = content
+    foundPost.imageUrl = 'images/' + imageUrl
     const savedPost = await foundPost.save()
+
     const post = {
       ...savedPost._doc,
       _id: savedPost._id.toString(),
@@ -192,12 +192,20 @@ module.exports = {
     }
   },
   async deletePost({ postInput }, req) {
-    // if (!req.isAuth) {
-    //   throw new AppError('Not authenticated.', 400)
-    // }
-
+    if (!req.isAuth) {
+      throw new AppError('Not authenticated.', 400)
+    }
+    //delete the post
     const { _id } = postInput
     const post = await Post.findByIdAndDelete(_id)
+
+    //delete the post from creator's posts
+    const creator = await User.findById(post.creator)
+    creator.posts = creator.posts.filter(el => !el.equals(_id))
+    await creator.save()
+
+    //delete the image
+    removeFile(post.imageUrl)
 
     return {
       ...post._doc,
@@ -209,5 +217,5 @@ module.exports = {
         _id: post.creator._id.toString(),
       },
     }
-  }
+  },
 }

@@ -28,16 +28,15 @@ app.use('/images', express.static(path.join(__dirname, 'images')))
 app.use(auth)
 
 const upload = require('./middleware/multer')
+const { removeFile } = require('./utils')
 
 app.put('/post-image', upload.single('image'), (req, res) => {  
   if (!req.isAuth) {
     throw new AppError('Not authenticated', 401)
   }
 
-  console.log(req.file);
-
   if(req.body.oldPath) {
-    //clear old image
+    removeFile(req.body.oldPath)
   }
   
   res.json({message: "image posted succesfully", filename: req.file.filename})

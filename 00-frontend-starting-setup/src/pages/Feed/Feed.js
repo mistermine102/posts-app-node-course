@@ -196,8 +196,9 @@ class Feed extends Component {
       })
       const { title: inputTitle, content: inputContent } = postData
       let filename
-
       const formData = new FormData()
+
+      formData.append('image', postData.image)
 
       if(this.state.editPost) {
         formData.append('oldPath', this.state.editPost.imagePath)
@@ -205,7 +206,7 @@ class Feed extends Component {
       }
 
       //uploading and updating image
-      if(typeof postData.image !== 'string') {
+      if (typeof postData.image !== 'string') {
         const imageUploadRes = await fetch('http://localhost:8080/post-image', {
           method: 'PUT',
           headers: {
@@ -215,20 +216,19 @@ class Feed extends Component {
         })
         const imageUploadResData = await imageUploadRes.json()
         filename = imageUploadResData.filename
-  
         if (!imageUploadRes.ok) {
           throw new Error(imageUploadResData.message)
         }
       }
-      return
+
       let mutation, idArg
 
-      if(this.state.editPost) {
-        mutation = "updatePost"
-        idArg = "_id: \"" + this.state.editPost._id + "\", "
+      if (this.state.editPost) {
+        mutation = 'updatePost'
+        idArg = '_id: "' + this.state.editPost._id + '", '
       } else {
-        mutation = "createPost"
-        idArg = ""
+        mutation = 'createPost'
+        idArg = ''
       }
 
       const graphqlQuery = {
@@ -248,7 +248,6 @@ class Feed extends Component {
         }
       `,
       }
-      console.log(graphqlQuery)
 
       const res = await fetch('http://localhost:8080/graphql', {
         method: 'POST',
@@ -259,7 +258,6 @@ class Feed extends Component {
         },
       })
       const resData = await res.json()
-
       const { _id, title, content, creator, createdAt, imageUrl } = resData.data[mutation]
 
       const post = {
@@ -268,8 +266,9 @@ class Feed extends Component {
         content,
         creator,
         createdAt,
-        imagePath: imageUrl
+        imagePath: imageUrl,
       }
+
       this.setState(prevState => {
         let updatedPosts = [...prevState.posts]
         if (prevState.editPost) {
@@ -310,14 +309,14 @@ class Feed extends Component {
             title
           }
         }
-      `
+      `,
     }
     fetch('http://localhost:8080/graphql', {
       method: 'POST',
-      body: JSON.stringify(graphqlQuery) ,
+      body: JSON.stringify(graphqlQuery),
       headers: {
         Authorization: 'Bearer ' + this.props.token,
-        "Content-Type": "application/json" 
+        'Content-Type': 'application/json',
       },
     })
       .then(res => {
