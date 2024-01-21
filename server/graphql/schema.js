@@ -63,6 +63,7 @@ module.exports = buildSchema(`
         login(email: String!, password: String!): AuthData!
         getPosts(page: Int!): PostData!
         getPost(id: ID!): Post!
+        getStatus(userId: ID!): String!
     }
 
     schema {

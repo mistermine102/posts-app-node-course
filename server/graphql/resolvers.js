@@ -218,4 +218,14 @@ module.exports = {
       },
     }
   },
+  async getStatus({ userId }) {
+    // if (!req.isAuth) {
+    //   throw new AppError('Not authenticated.', 400)
+    // }
+    if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
+      throw new AppError('Invalid post id.', 400)
+    }
+    const foundUser = await User.findById(userId)
+    return foundUser.status
+  }
 }

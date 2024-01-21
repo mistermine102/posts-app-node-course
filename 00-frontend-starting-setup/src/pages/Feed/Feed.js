@@ -22,10 +22,15 @@ class Feed extends Component {
   }
 
   componentDidMount() {
-    fetch('http://localhost:8080/status/' + this.props.userId, {
+    fetch('http://localhost:8080/graphql', {
+      method: "POST",
       headers: {
         Authorization: 'Bearer ' + this.props.token,
+        "Content-Type": "application/json"
       },
+      body: JSON.stringify({query: `{
+        getStatus(userId: "${this.props.userId}")
+      }`})
     })
       .then(res => {
         if (res.status !== 200) {
@@ -34,7 +39,7 @@ class Feed extends Component {
         return res.json()
       })
       .then(resData => {
-        this.setState({ status: resData.status })
+        this.setState({ status: resData.data.getStatus })
       })
       .catch(this.catchError)
 
@@ -200,7 +205,7 @@ class Feed extends Component {
 
       formData.append('image', postData.image)
 
-      if(this.state.editPost) {
+      if (this.state.editPost) {
         formData.append('oldPath', this.state.editPost.imagePath)
         filename = this.state.editPost.imagePath
       }
